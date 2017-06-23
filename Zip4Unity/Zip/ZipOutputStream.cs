@@ -1019,10 +1019,7 @@ namespace Ionic.Zip
         /// <seealso cref="Ionic.Zip.ZipFile.ProvisionalAlternateEncoding"/>
         public static System.Text.Encoding DefaultEncoding
         {
-            get
-            {
-                return System.Text.Encoding.GetEncoding("IBM437");
-            }
+            get { return System.Text.Encoding.UTF8; }
         }
 
 
@@ -1614,8 +1611,7 @@ namespace Ionic.Zip
         private Dictionary<String, ZipEntry> _entriesWritten;
         private int _entryCount;
         private ZipOption _alternateEncodingUsage = ZipOption.Never;
-        private System.Text.Encoding _alternateEncoding
-            = System.Text.Encoding.GetEncoding("IBM437"); // default = IBM437
+        private System.Text.Encoding _alternateEncoding = System.Text.Encoding.UTF8; 
 
         private bool _leaveUnderlyingStreamOpen;
         private bool _disposed;

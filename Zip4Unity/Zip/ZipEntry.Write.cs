@@ -566,9 +566,9 @@ namespace Ionic.Zip
 
                 case ZipOption.Never:
                     if (!(_Comment == null || _Comment.Length == 0))
-                        _CommentBytes = ibm437.GetBytes(_Comment);
-                    _actualEncoding = ibm437;
-                    return ibm437.GetBytes(s1);
+                        _CommentBytes = defaultEncoding.GetBytes(_Comment);
+                    _actualEncoding = defaultEncoding;
+                    return defaultEncoding.GetBytes(s1);
             }
 
             // arriving here means AlternateEncodingUsage is "AsNecessary"
@@ -578,9 +578,9 @@ namespace Ionic.Zip
             // only when _actualEncoding is not yet set (it can be set
             // during Read), and when ibm437 will not do.
 
-            byte[] result = ibm437.GetBytes(s1);
+            byte[] result = defaultEncoding.GetBytes(s1);
             // need to use this form of GetString() for .NET CF
-            string s2 = ibm437.GetString(result, 0, result.Length);
+            string s2 = defaultEncoding.GetString(result, 0, result.Length);
             _CommentBytes = null;
             if (s2 != s1)
             {
@@ -594,7 +594,7 @@ namespace Ionic.Zip
                 return result;
             }
 
-            _actualEncoding = ibm437;
+            _actualEncoding = defaultEncoding;
 
             // Using ibm437, FileName can be encoded without information
             // loss; now try the Comment.
@@ -604,8 +604,8 @@ namespace Ionic.Zip
                 return result;
 
             // there is a comment. Get the encoded form.
-            byte[] cbytes = ibm437.GetBytes(_Comment);
-            string c2 = ibm437.GetString(cbytes,0,cbytes.Length);
+            byte[] cbytes = defaultEncoding.GetBytes(_Comment);
+            string c2 = defaultEncoding.GetString(cbytes,0,cbytes.Length);
 
             // Check for round-trip.
             if (c2 != Comment)
