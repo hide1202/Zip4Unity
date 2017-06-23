@@ -269,27 +269,11 @@ namespace Ionic.Zip
             // bit 0 set indicates that some kind of encryption is in use
             if ((ze._BitField & 0x01) == 0x01)
             {
-#if AESCRYPTO
-                if (ze.Encryption == EncryptionAlgorithm.WinZipAes128 ||
-                    ze.Encryption == EncryptionAlgorithm.WinZipAes256)
-                {
-                    int bits = ZipEntry.GetKeyStrengthInBits(ze._Encryption_FromZipFile);
-                    // read in the WinZip AES metadata: salt + PV. 18 bytes for AES256. 10 bytes for AES128.
-                    ze._aesCrypto_forExtract = WinZipAesCrypto.ReadFromStream(null, bits, ze.ArchiveStream);
-                    bytesRead += ze._aesCrypto_forExtract.SizeOfEncryptionMetadata - 10; // MAC (follows crypto bytes)
-                    // according to WinZip, the CompressedSize includes the AES Crypto framing data.
-                    ze._CompressedFileDataSize -= ze._aesCrypto_forExtract.SizeOfEncryptionMetadata;
-                    ze._LengthOfTrailer += 10;  // MAC
-                }
-                else
-#endif
-                {
-                    // read in the header data for "weak" encryption
-                    ze._WeakEncryptionHeader = new byte[12];
-                    bytesRead += ZipEntry.ReadWeakEncryptionHeader(ze._archiveStream, ze._WeakEncryptionHeader);
-                    // decrease the filedata size by 12 bytes
-                    ze._CompressedFileDataSize -= 12;
-                }
+                // read in the header data for "weak" encryption
+                ze._WeakEncryptionHeader = new byte[12];
+                bytesRead += ZipEntry.ReadWeakEncryptionHeader(ze._archiveStream, ze._WeakEncryptionHeader);
+                // decrease the filedata size by 12 bytes
+                ze._CompressedFileDataSize -= 12;
             }
 
             // Remember the size of the blob for this entry.
@@ -533,12 +517,6 @@ namespace Ionic.Zip
                             j = ProcessExtraFieldZip64(buffer, j, dataSize, posn);
                             break;
 
-#if AESCRYPTO
-                        case 0x9901: // WinZip AES encryption is in use.  (workitem 6834)
-                            // we will handle this extra field only  if compressionmethod is 0x63
-                            j = ProcessExtraFieldWinZipAes(buffer, j, dataSize, posn);
-                            break;
-#endif
                         case 0x0017: // workitem 7968: handle PKWare Strong encryption header
                             j = ProcessExtraFieldPkwareStrongEncryption(buffer, j);
                             break;
@@ -577,53 +555,6 @@ namespace Ionic.Zip
 
             return j;
         }
-
-
-#if AESCRYPTO
-        private int ProcessExtraFieldWinZipAes(byte[] buffer, int j, Int16 dataSize, long posn)
-        {
-            if (this._CompressionMethod == 0x0063)
-            {
-                if ((this._BitField & 0x01) != 0x01)
-                    throw new BadReadException(String.Format("  Inconsistent metadata at position 0x{0:X16}", posn));
-
-                this._sourceIsEncrypted = true;
-
-                //this._aesCrypto = new WinZipAesCrypto(this);
-                // see spec at http://www.winzip.com/aes_info.htm
-                if (dataSize != 7)
-                    throw new BadReadException(String.Format("  Inconsistent size (0x{0:X4}) in WinZip AES field at position 0x{1:X16}", dataSize, posn));
-
-                this._WinZipAesMethod = BitConverter.ToInt16(buffer, j);
-                j += 2;
-                if (this._WinZipAesMethod != 0x01 && this._WinZipAesMethod != 0x02)
-                    throw new BadReadException(String.Format("  Unexpected vendor version number (0x{0:X4}) for WinZip AES metadata at position 0x{1:X16}",
-                        this._WinZipAesMethod, posn));
-
-                Int16 vendorId = BitConverter.ToInt16(buffer, j);
-                j += 2;
-                if (vendorId != 0x4541)
-                    throw new BadReadException(String.Format("  Unexpected vendor ID (0x{0:X4}) for WinZip AES metadata at position 0x{1:X16}", vendorId, posn));
-
-                int keystrength = (buffer[j] == 1) ? 128 : (buffer[j] == 3) ? 256 : -1;
-                if (keystrength < 0)
-                    throw new BadReadException(String.Format("Invalid key strength ({0})", keystrength));
-
-                _Encryption_FromZipFile = this._Encryption = (keystrength == 128)
-                    ? EncryptionAlgorithm.WinZipAes128
-                    : EncryptionAlgorithm.WinZipAes256;
-
-                j++;
-
-                // set the actual compression method
-                this._CompressionMethod_FromZipFile =
-                this._CompressionMethod = BitConverter.ToInt16(buffer, j);
-                j += 2; // for the next segment of the extra field
-            }
-            return j;
-        }
-
-#endif
 
         private delegate T Func<T>();
 

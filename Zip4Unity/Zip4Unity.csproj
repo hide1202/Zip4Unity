@@ -41,7 +41,6 @@
   <ItemGroup>
     <Compile Include="CommonSrc\CRC32.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Zip\ComHelper.cs" />
     <Compile Include="Zip\EncryptionAlgorithm.cs" />
     <Compile Include="Zip\Events.cs" />
     <Compile Include="Zip\Exceptions.cs" />
@@ -49,7 +48,6 @@
     <Compile Include="Zip\FileSelector.cs" />
     <Compile Include="Zip\OffsetStream.cs" />
     <Compile Include="Zip\Shared.cs" />
-    <Compile Include="Zip\WinZipAes.cs" />
     <Compile Include="Zip\ZipConstants.cs" />
     <Compile Include="Zip\ZipCrypto.cs" />
     <Compile Include="Zip\ZipDirEntry.cs" />

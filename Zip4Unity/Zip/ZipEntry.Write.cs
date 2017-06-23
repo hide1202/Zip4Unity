@@ -96,16 +96,6 @@ namespace Ionic.Zip
             bytes[i++] = (byte)(_CompressionMethod & 0x00FF);
             bytes[i++] = (byte)((_CompressionMethod & 0xFF00) >> 8);
 
-#if AESCRYPTO
-            if (Encryption == EncryptionAlgorithm.WinZipAes128 ||
-            Encryption == EncryptionAlgorithm.WinZipAes256)
-            {
-                i -= 2;
-                bytes[i++] = 0x63;
-                bytes[i++] = 0;
-            }
-#endif
-
             bytes[i++] = (byte)(_TimeBlob & 0x000000FF);
             bytes[i++] = (byte)((_TimeBlob & 0x0000FF00) >> 8);
             bytes[i++] = (byte)((_TimeBlob & 0x00FF0000) >> 16);
@@ -368,49 +358,7 @@ namespace Ionic.Zip
                 }
                 listOfBlocks.Add(block);
             }
-
-
-#if AESCRYPTO
-            if (Encryption == EncryptionAlgorithm.WinZipAes128 ||
-                Encryption == EncryptionAlgorithm.WinZipAes256)
-            {
-                block = new byte[4 + 7];
-                int i = 0;
-                // extra field for WinZip AES
-                // header id
-                block[i++] = 0x01;
-                block[i++] = 0x99;
-
-                // data size
-                block[i++] = 0x07;
-                block[i++] = 0x00;
-
-                // vendor number
-                block[i++] = 0x01;  // AE-1 - means "Verify CRC"
-                block[i++] = 0x00;
-
-                // vendor id "AE"
-                block[i++] = 0x41;
-                block[i++] = 0x45;
-
-                // key strength
-                int keystrength = GetKeyStrengthInBits(Encryption);
-                if (keystrength == 128)
-                    block[i] = 1;
-                else if (keystrength == 256)
-                    block[i] = 3;
-                else
-                    block[i] = 0xFF;
-                i++;
-
-                // actual compression method
-                block[i++] = (byte)(_CompressionMethod & 0x00FF);
-                block[i++] = (byte)(_CompressionMethod & 0xFF00);
-
-                listOfBlocks.Add(block);
-            }
-#endif
-
+            
             if (_ntfsTimesAreSet && _emitNtfsTimes)
             {
                 block = new byte[32 + 4];
@@ -686,11 +634,7 @@ namespace Ionic.Zip
             if (_CompressedSize < _UncompressedSize) return false;
 
             if (this._Source == ZipEntrySource.Stream && !this._sourceStream.CanSeek) return false;
-
-#if AESCRYPTO
-            if (_aesCrypto_forWrite != null && (CompressedSize - _aesCrypto_forWrite.SizeOfEncryptionMetadata) <= UncompressedSize + 0x10) return false;
-#endif
-
+            
             if (_zipCrypto_forWrite != null && (CompressedSize - 12) <= UncompressedSize) return false;
 
             return true;
@@ -1031,15 +975,6 @@ namespace Ionic.Zip
                 // (cycle == 99) indicates a zero-length entry written by ZipOutputStream
                 SetZip64Flags();
             }
-
-#if AESCRYPTO
-            else if (Encryption == EncryptionAlgorithm.WinZipAes128 || Encryption == EncryptionAlgorithm.WinZipAes256)
-            {
-                i -= 2;
-                block[i++] = 0x63;
-                block[i++] = 0;
-            }
-#endif
 
             // LastMod
             _TimeBlob = Ionic.Zip.SharedUtilities.DateTimeToPacked(LastModified);
@@ -1525,15 +1460,7 @@ namespace Ionic.Zip
             _LengthOfTrailer = 0;
 
             _UncompressedSize = output.TotalBytesSlurped;
-
-#if AESCRYPTO
-            WinZipAesCipherStream wzacs = encryptor as WinZipAesCipherStream;
-            if (wzacs != null && _UncompressedSize > 0)
-            {
-                s.Write(wzacs.FinalAuthentication, 0, 10);
-                _LengthOfTrailer += 10;
-            }
-#endif
+            
             _CompressedFileDataSize = entryCounter.BytesWritten;
             _CompressedSize = _CompressedFileDataSize;   // may be adjusted
             _Crc32 = output.Crc;
@@ -1563,13 +1490,6 @@ namespace Ionic.Zip
                     int headerBytesToRetract = 0;
                     if (Encryption == EncryptionAlgorithm.PkzipWeak)
                         headerBytesToRetract = 12;
-#if AESCRYPTO
-                    else if (Encryption == EncryptionAlgorithm.WinZipAes128 ||
-                             Encryption == EncryptionAlgorithm.WinZipAes256)
-                    {
-                        headerBytesToRetract = _aesCrypto_forWrite._Salt.Length + _aesCrypto_forWrite.GeneratedPV.Length;
-                    }
-#endif
                     if (this._Source == ZipEntrySource.ZipOutputStream && !s.CanSeek)
                         throw new ZipException("Zero bytes written, encryption in use, and non-seekable output.");
 
@@ -1598,50 +1518,17 @@ namespace Ionic.Zip
                     int j = 6;
                     _EntryHeader[j++] = (byte)(_BitField & 0x00FF);
                     _EntryHeader[j++] = (byte)((_BitField & 0xFF00) >> 8);
-
-#if AESCRYPTO
-                    if (Encryption == EncryptionAlgorithm.WinZipAes128 ||
-                        Encryption == EncryptionAlgorithm.WinZipAes256)
-                    {
-                        // Fix the extra field - overwrite the 0x9901 headerId
-                        // with dummy data. (arbitrarily, 0x9999)
-                        Int16 fnLength = (short)(_EntryHeader[26] + _EntryHeader[27] * 256);
-                        int offx = 30 + fnLength;
-                        int aesIndex = FindExtraFieldSegment(_EntryHeader, offx, 0x9901);
-                        if (aesIndex >= 0)
-                        {
-                            _EntryHeader[aesIndex++] = 0x99;
-                            _EntryHeader[aesIndex++] = 0x99;
-                        }
-                    }
-#endif
                 }
 
                 CompressionMethod = 0;
                 Encryption = EncryptionAlgorithm.None;
             }
-            else if (_zipCrypto_forWrite != null
-#if AESCRYPTO
-                     || _aesCrypto_forWrite != null
-#endif
-                     )
-
+            else if (_zipCrypto_forWrite != null)
             {
                 if (Encryption == EncryptionAlgorithm.PkzipWeak)
                 {
                     _CompressedSize += 12; // 12 extra bytes for the encryption header
                 }
-#if AESCRYPTO
-                else if (Encryption == EncryptionAlgorithm.WinZipAes128 ||
-                         Encryption == EncryptionAlgorithm.WinZipAes256)
-                {
-                    // adjust the compressed size to include the variable (salt+pv)
-                    // security header and 10-byte trailer. According to the winzip AES
-                    // spec, that metadata is included in the "Compressed Size" figure
-                    // when encoding the zip archive.
-                    _CompressedSize += _aesCrypto_forWrite.SizeOfEncryptionMetadata;
-                }
-#endif
             }
 
             int i = 8;
@@ -1731,42 +1618,6 @@ namespace Ionic.Zip
                     }
                 }
             }
-
-
-#if AESCRYPTO
-
-            if (Encryption == EncryptionAlgorithm.WinZipAes128 ||
-                Encryption == EncryptionAlgorithm.WinZipAes256)
-            {
-                // Must set compressionmethod to 0x0063 (decimal 99)
-                //
-                // and then set the compression method bytes inside the extra
-                // field to the actual compression method value.
-
-                i = 8;
-                _EntryHeader[i++] = 0x63;
-                _EntryHeader[i++] = 0;
-
-                i = 30 + filenameLength;
-                do
-                {
-                    UInt16 HeaderId = (UInt16)(_EntryHeader[i] + _EntryHeader[i + 1] * 256);
-                    Int16 DataSize = (short)(_EntryHeader[i + 2] + _EntryHeader[i + 3] * 256);
-                    if (HeaderId != 0x9901)
-                    {
-                        // skip this header
-                        i += DataSize + 4;
-                    }
-                    else
-                    {
-                        i += 9;
-                        // actual compression method
-                        _EntryHeader[i++] = (byte)(_CompressionMethod & 0x00FF);
-                        _EntryHeader[i++] = (byte)(_CompressionMethod & 0xFF00);
-                    }
-                } while (i < (extraFieldLength - 30 - filenameLength));
-            }
-#endif
 
             // finally, write the data.
 
@@ -2025,15 +1876,6 @@ namespace Ionic.Zip
 
                 return new ZipCipherStream(s, _zipCrypto_forWrite, CryptoMode.Encrypt);
             }
-#if AESCRYPTO
-            if (Encryption == EncryptionAlgorithm.WinZipAes128 ||
-                     Encryption == EncryptionAlgorithm.WinZipAes256)
-            {
-                TraceWriteLine("MaybeApplyEncryption: e({0}) AES", FileName);
-
-                return new WinZipAesCipherStream(s, _aesCrypto_forWrite, CryptoMode.Encrypt);
-            }
-#endif
             TraceWriteLine("MaybeApplyEncryption: e({0}) None", FileName);
 
             return s;
@@ -2278,9 +2120,6 @@ namespace Ionic.Zip
             if (pwd == null)
             {
                 _zipCrypto_forWrite = null;
-#if AESCRYPTO
-                _aesCrypto_forWrite = null;
-#endif
                 return;
             }
 
@@ -2340,27 +2179,6 @@ namespace Ionic.Zip
                 outstream.Write(cipherText, 0, cipherText.Length);
                 _LengthOfHeader += cipherText.Length;  // 12 bytes
             }
-
-#if AESCRYPTO
-            else if (Encryption == EncryptionAlgorithm.WinZipAes128 ||
-                Encryption == EncryptionAlgorithm.WinZipAes256)
-            {
-                // If WinZip AES encryption is in use, then the encrypted entry data is
-                // preceded by a variable-sized Salt and a 2-byte "password
-                // verification" value for the entry.
-
-                int keystrength = GetKeyStrengthInBits(Encryption);
-                _aesCrypto_forWrite = WinZipAesCrypto.Generate(pwd, keystrength);
-                outstream.Write(_aesCrypto_forWrite.Salt, 0, _aesCrypto_forWrite._Salt.Length);
-                outstream.Write(_aesCrypto_forWrite.GeneratedPV, 0, _aesCrypto_forWrite.GeneratedPV.Length);
-                _LengthOfHeader += _aesCrypto_forWrite._Salt.Length + _aesCrypto_forWrite.GeneratedPV.Length;
-
-                TraceWriteLine("WriteSecurityMetadata: AES e({0}) keybits({1}) _LOH({2})",
-                               FileName, keystrength, _LengthOfHeader);
-
-            }
-#endif
-
         }
 
 

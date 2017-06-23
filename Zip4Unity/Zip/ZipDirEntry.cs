@@ -309,15 +309,6 @@ namespace Ionic.Zip
                 // the "encryption header" of 12 bytes precedes the file data
                 zde._CompressedFileDataSize -= 12;
             }
-#if AESCRYPTO
-            else if (zde.Encryption == EncryptionAlgorithm.WinZipAes128 ||
-                        zde.Encryption == EncryptionAlgorithm.WinZipAes256)
-            {
-                zde._CompressedFileDataSize = zde.CompressedSize -
-                    (ZipEntry.GetLengthOfCryptoHeaderBytes(zde.Encryption) + 10);
-                zde._LengthOfTrailer = 10;
-            }
-#endif
 
             // tally the trailing descriptor
             if ((zde._BitField & 0x0008) == 0x0008)

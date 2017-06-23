@@ -2624,32 +2624,12 @@ namespace Ionic.Zip
             // workitem 10178
             Ionic.Zip.SharedUtilities.Workaround_Ladybug318918(this.ArchiveStream);
         }
-
-
-
-#if AESCRYPTO
-        private static int GetKeyStrengthInBits(EncryptionAlgorithm a)
-        {
-            if (a == EncryptionAlgorithm.WinZipAes256) return 256;
-            else if (a == EncryptionAlgorithm.WinZipAes128) return 128;
-            return -1;
-        }
-#endif
-
+        
         internal static int GetLengthOfCryptoHeaderBytes(EncryptionAlgorithm a)
         {
             //if ((_BitField & 0x01) != 0x01) return 0;
             if (a == EncryptionAlgorithm.None) return 0;
 
-#if AESCRYPTO
-            if (a == EncryptionAlgorithm.WinZipAes128 ||
-                a == EncryptionAlgorithm.WinZipAes256)
-            {
-                int KeyStrengthInBits = GetKeyStrengthInBits(a);
-                int sizeOfSaltAndPv = ((KeyStrengthInBits / 8 / 2) + 2);
-                return sizeOfSaltAndPv;
-            }
-#endif
             if (a == EncryptionAlgorithm.PkzipWeak)
                 return 12;
             throw new ZipException("internal error");
@@ -2682,11 +2662,6 @@ namespace Ionic.Zip
 
         private ZipCrypto _zipCrypto_forExtract;
         private ZipCrypto _zipCrypto_forWrite;
-#if AESCRYPTO
-        private WinZipAesCrypto _aesCrypto_forExtract;
-        private WinZipAesCrypto _aesCrypto_forWrite;
-        private Int16 _WinZipAesMethod;
-#endif
 
         internal DateTime _LastModified;
         private DateTime _Mtime, _Atime, _Ctime;  // workitem 6878: NTFS quantities
