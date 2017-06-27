@@ -751,7 +751,7 @@ namespace Ionic.Zip
                     targetFileName += ".tmp";
                     var dirName = Path.GetDirectoryName(targetFileName);
                     // ensure the target path exists
-                    if (!Directory.Exists(dirName))
+                    if (!string.IsNullOrEmpty(dirName) && !Directory.Exists(dirName))
                     {
                         // we create the directory here, but we do not set the
                         // create/modified/accessed times on it because it is being
@@ -1344,7 +1344,7 @@ namespace Ionic.Zip
                     outFileName = Path.Combine(basedir, f);
 
                 // workitem 10639
-                outFileName = outFileName.Replace("/","\\");
+                outFileName = outFileName.Replace('/', Path.DirectorySeparatorChar);
 
                 // check if it is a directory
                 if ((IsDirectory) || (FileName.EndsWith("/")))
